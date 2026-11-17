@@ -51,7 +51,6 @@ class _CardDeckStageState extends State<CardDeckStage>
 
   bool _isHorizontalDragging = false;
   bool _isVerticalDragging = false;
-  double _dragStartPeekValue = 0.0;
   double _dragStartExpandValue = 0.0;
 
   @override
@@ -65,7 +64,7 @@ class _CardDeckStageState extends State<CardDeckStage>
     );
     _expandController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 340),
+      duration: const Duration(milliseconds: 320),
       value: widget.deckMode == DeckPresentationMode.expandedVerticalList
           ? 1.0
           : 0.0,
@@ -116,7 +115,6 @@ class _CardDeckStageState extends State<CardDeckStage>
   void _handleHorizontalDragStart(DragStartDetails details) {
     if (_expandController.value > 0.1 || _isInteractionLocked) return;
     _isHorizontalDragging = true;
-    _dragStartPeekValue = _peekController.value;
   }
 
   void _handleHorizontalDragUpdate(DragUpdateDetails details, double width) {
@@ -131,10 +129,8 @@ class _CardDeckStageState extends State<CardDeckStage>
     _isHorizontalDragging = false;
 
     final velocity = details.primaryVelocity ?? 0.0;
-    final shouldOpenPeek = velocity < -320 ||
-        (velocity.abs() <= 320 &&
-            (_peekController.value > 0.35 ||
-                (_dragStartPeekValue == 0.0 && _peekController.value > 0.2)));
+    final shouldOpenPeek = velocity < -280 ||
+        (velocity.abs() <= 280 && _peekController.value > 0.28);
 
     if (shouldOpenPeek) {
       _peekController.animateTo(1.0, curve: Curves.easeOutCubic);
@@ -153,7 +149,9 @@ class _CardDeckStageState extends State<CardDeckStage>
 
   void _handleVerticalDragUpdate(DragUpdateDetails details, double height) {
     if (!_isVerticalDragging) return;
-    final delta = (details.primaryDelta ?? 0.0) / (height * 0.42);
+    final dy = details.primaryDelta ?? 0.0;
+    // Dragging UP (negative dy) pulls the bottom card stack up into the full list
+    final delta = -dy / (height * 0.34);
     _expandController.value = (_expandController.value + delta).clamp(0.0, 1.0);
   }
 
@@ -162,11 +160,11 @@ class _CardDeckStageState extends State<CardDeckStage>
     _isVerticalDragging = false;
 
     final velocity = details.primaryVelocity ?? 0.0;
-    final shouldExpand = velocity > 320 ||
-        (velocity.abs() <= 320 &&
-            (_expandController.value > 0.38 ||
+    final shouldExpand = velocity < -240 ||
+        (velocity.abs() <= 240 &&
+            (_expandController.value > 0.28 ||
                 (_dragStartExpandValue == 0.0 &&
-                    _expandController.value > 0.22)));
+                    _expandController.value > 0.16)));
 
     if (shouldExpand) {
       _expandController.animateTo(1.0, curve: Curves.easeOutCubic);
@@ -175,6 +173,13 @@ class _CardDeckStageState extends State<CardDeckStage>
       _expandController.animateTo(0.0, curve: Curves.easeOutCubic);
       widget.onDeckModeChanged(DeckPresentationMode.collapsedStack);
     }
+  }
+
+  void _expandAllCards() {
+    if (_isInteractionLocked) return;
+    HapticFeedback.selectionClick();
+    _expandController.animateTo(1.0, curve: Curves.easeOutCubic);
+    widget.onDeckModeChanged(DeckPresentationMode.expandedVerticalList);
   }
 
   void _handleLongPressStart() {
@@ -258,12 +263,21 @@ class _CardDeckStageState extends State<CardDeckStage>
               final expandT = _expandController.value;
               final pressScale = 1.0 - (_pressScaleController.value * 0.03);
 
-              if (expandT > 0.85) {
+              if (expandT > 0.72) {
                 return _ExpandedVerticalCardList(
                   cards: widget.cards,
                   selectedIndex: safeIndex,
                   controller: _verticalListController,
-                  onSelectCard: widget.onSelectCard,
+                  onSelectCard: (idx) {
+                    widget.onSelectCard(idx);
+                    _expandController.animateTo(
+                      0.0,
+                      curve: Curves.easeOutCubic,
+                    );
+                    widget.onDeckModeChanged(
+                      DeckPresentationMode.collapsedStack,
+                    );
+                  },
                   onCollapse: () {
                     _expandController.animateTo(
                       0.0,
@@ -296,7 +310,7 @@ class _CardDeckStageState extends State<CardDeckStage>
                         ),
                       ),
                     ),
-                  // Layered bottom card deck (back-to-front z-index order)
+                  // Responsive bottom stacked cards (back-to-front z-index order)
                   ..._buildBottomStackedCards(
                     stackedCards: stackedCards,
                     stageWidth: stageWidth,
@@ -307,7 +321,7 @@ class _CardDeckStageState extends State<CardDeckStage>
                   ),
                   // Primary front card
                   Positioned(
-                    top: 10,
+                    top: 10 - (expandT * 18),
                     left: horizontalPadding,
                     width: cardWidth,
                     child: IgnorePointer(
@@ -360,7 +374,7 @@ class _CardDeckStageState extends State<CardDeckStage>
                                 ..setEntry(3, 2, 0.0014)
                                 ..translateByDouble(
                                   -peekT * (cardWidth * 0.44),
-                                  expandT * 8,
+                                  0.0,
                                   0.0,
                                   1.0,
                                 )
@@ -383,12 +397,12 @@ class _CardDeckStageState extends State<CardDeckStage>
                   ),
                   if (peekT < 0.25)
                     Positioned(
-                      top: 10 + cardHeight + 12 + (expandT * 24),
+                      top: 10 + cardHeight + 12,
                       left: 0,
                       right: 0,
                       child: Opacity(
                         opacity: (1.0 - (peekT * 4)).clamp(0.0, 1.0) *
-                            (1.0 - expandT),
+                            (1.0 - (expandT * 1.4)).clamp(0.0, 1.0),
                         child: Center(
                           child: _FlipperActionPill(
                             cardId: activeCard.id,
@@ -427,15 +441,17 @@ class _CardDeckStageState extends State<CardDeckStage>
     final visibleCount = math.min(stackedCards.length, 4);
     final widgets = <Widget>[];
 
-    // Staggered vertical fan so all 4 background cards clearly peek out above bottom edge
-    const peekHeights = <double>[86.0, 134.0, 160.0, 178.0];
+    // Responsive proportional peek heights & width scales based on available stageHeight
+    final basePeek = (stageHeight * 0.16).clamp(64.0, 96.0);
+    final stepPeek = (stageHeight * 0.052).clamp(18.0, 32.0);
     const widthScales = <double>[0.96, 0.90, 0.83, 0.74];
 
     for (int depth = visibleCount - 1; depth >= 0; depth--) {
       final entry = stackedCards[depth];
       final targetScale = widthScales[depth];
       final scale = targetScale + ((1.0 - targetScale) * expandT);
-      final collapsedTop = stageHeight - peekHeights[depth];
+      final peekHeight = basePeek + (depth * stepPeek);
+      final collapsedTop = stageHeight - peekHeight;
       final expandedTop = 10.0 + ((depth + 1) * (cardHeight + 14.0));
       final currentTop =
           collapsedTop + ((expandedTop - collapsedTop) * expandT);
@@ -443,16 +459,26 @@ class _CardDeckStageState extends State<CardDeckStage>
       widgets.add(
         AnimatedPositioned(
           key: Key('stacked_card_${entry.value.id}_${entry.key}'),
-          duration: const Duration(milliseconds: 280),
+          duration: _isVerticalDragging
+              ? Duration.zero
+              : const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
           top: currentTop,
           left: (stageWidth - (cardWidth * scale)) / 2,
           width: cardWidth * scale,
           child: GestureDetector(
+            onVerticalDragStart: _handleVerticalDragStart,
+            onVerticalDragUpdate: (d) =>
+                _handleVerticalDragUpdate(d, stageHeight),
+            onVerticalDragEnd: _handleVerticalDragEnd,
             onTap: () {
               if (_isInteractionLocked) return;
-              HapticFeedback.selectionClick();
-              widget.onSelectCard(entry.key);
+              if (depth == 0) {
+                HapticFeedback.selectionClick();
+                widget.onSelectCard(entry.key);
+              } else {
+                _expandAllCards();
+              }
             },
             child: BankCardArtwork(
               card: entry.value,
@@ -559,7 +585,7 @@ class _FlipperActionPillState extends State<_FlipperActionPill> {
             : widget.onPendingActionsTap,
         child: Container(
           height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: AppColors.surfaceWhite,
             borderRadius: BorderRadius.circular(AppSpacing.pillRadius),
@@ -572,83 +598,107 @@ class _FlipperActionPillState extends State<_FlipperActionPill> {
               ),
             ],
           ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) {
-              final offsetTween = Tween<Offset>(
-                begin: const Offset(0, 0.55),
-                end: Offset.zero,
-              );
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: offsetTween.animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: showingDetails
-                ? const Row(
-                    key: ValueKey('pill_view_details'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'View details',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.inkPrimary,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: AppColors.inkSecondary,
-                      ),
-                    ],
-                  )
-                : Row(
-                    key: const ValueKey('pill_pending_actions'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: AppColors.alertCoral,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Text(
-                          '!',
+          child: ClipRect(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              transitionBuilder: (child, animation) {
+                // Pure vertical slot-roller transition (slides up from bottom, exits upward)
+                final isIncoming = child.key ==
+                    ValueKey(
+                      showingDetails
+                          ? 'pill_view_details'
+                          : 'pill_pending_actions',
+                    );
+                final slideTween = isIncoming
+                    ? Tween<Offset>(
+                        begin: const Offset(0, 1.0),
+                        end: Offset.zero,
+                      )
+                    : Tween<Offset>(
+                        begin: const Offset(0, -1.0),
+                        end: Offset.zero,
+                      );
+
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: slideTween.animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: showingDetails
+                  ? const Row(
+                      key: ValueKey('pill_view_details'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'View details',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            height: 1,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkPrimary,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${widget.pendingCount} pending ${widget.pendingCount == 1 ? 'action' : 'actions'}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.inkPrimary,
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: AppColors.inkSecondary,
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: AppColors.inkSecondary,
-                      ),
-                    ],
-                  ),
+                      ],
+                    )
+                  : Row(
+                      key: const ValueKey('pill_pending_actions'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: AppColors.alertCoral,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Text(
+                            '!',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${widget.pendingCount} pending ${widget.pendingCount == 1 ? 'action' : 'actions'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: AppColors.inkSecondary,
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

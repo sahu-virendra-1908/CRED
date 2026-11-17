@@ -74,11 +74,13 @@ class _CardLongPressSheetState extends State<CardLongPressSheet>
       animation: _curvedAnimation,
       builder: (context, _) {
         final t = _curvedAnimation.value;
-        // Realistic 3D flip/tilt as the card rises from stack into the expanded slot
-        final flipX = math.sin(t * math.pi) * (math.pi / 4.2);
-        final flipY = math.sin(t * math.pi) * (math.pi / 16);
-        final cardRiseY = (1.0 - t) * (screenHeight * 0.24);
-        final cardScale = 0.96 + (0.04 * t);
+        // Card starts lower at its stage position (+260px) and rises UP to top slot (0px)
+        // On reverse/close, t goes 1.0 -> 0.0 so the card glides DOWN from top back to center
+        final cardRiseY = (1.0 - t) * (screenHeight * 0.30);
+        final flipX = math.sin(t * math.pi) * (math.pi / 4.0);
+        final cardScale = 0.94 + (0.06 * t);
+        final detailsOpacity = ((t - 0.25) / 0.75).clamp(0.0, 1.0);
+        final detailsSlideY = (1.0 - t) * 32.0;
 
         return GestureDetector(
           key: const Key('card_detail_backdrop'),
@@ -86,15 +88,16 @@ class _CardLongPressSheetState extends State<CardLongPressSheet>
           onVerticalDragUpdate: (details) {
             if (_isClosing) return;
             final delta = details.primaryDelta ?? 0;
-            if (delta < 0) {
+            // Dragging downward collapses the card back down into the stack
+            if (delta > 0) {
               _controller.value =
-                  (_controller.value + (delta / (screenHeight * 0.35)))
+                  (_controller.value - (delta / (screenHeight * 0.36)))
                       .clamp(0.0, 1.0);
             }
           },
           onVerticalDragEnd: (details) {
             if (_isClosing) return;
-            if ((details.primaryVelocity ?? 0) < -300 ||
+            if ((details.primaryVelocity ?? 0) > 280 ||
                 _controller.value < 0.65) {
               _closeSheet();
             } else {
@@ -102,36 +105,36 @@ class _CardLongPressSheetState extends State<CardLongPressSheet>
             }
           },
           child: ColoredBox(
-            color: Colors.black.withValues(alpha: 0.68 * t),
+            color: Colors.black.withValues(alpha: 0.70 * t),
             child: Align(
               alignment: Alignment.topCenter,
               child: GestureDetector(
                 onTap: () {},
-                child: Transform.translate(
-                  offset: Offset(0, -(1.0 - t) * (screenHeight * 0.45)),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.fromLTRB(20, topInset + 10, 20, 22),
-                    decoration: const BoxDecoration(
-                      color: AppColors.surfaceWhite,
-                      borderRadius: BorderRadius.vertical(
-                        bottom: Radius.circular(22),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x3D000000),
-                          blurRadius: 28,
-                          offset: Offset(0, 14),
-                        ),
-                      ],
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(20, topInset + 10, 20, 22),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceWhite.withValues(alpha: t),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(22),
                     ),
-                    child: SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.24 * t),
+                        blurRadius: 28,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Opacity(
+                          opacity: detailsOpacity,
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
@@ -155,153 +158,169 @@ class _CardLongPressSheetState extends State<CardLongPressSheet>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.0018)
-                              ..translateByDouble(0.0, cardRiseY, 0.0, 1.0)
-                              ..rotateX(flipX)
-                              ..rotateY(flipY)
-                              ..scaleByDouble(cardScale, cardScale, 1.0, 1.0),
-                            child: BankCardArtwork(
-                              card: widget.card,
-                              isDockedInSheet: true,
-                              onPayNow: () => _closeSheet(widget.onPayNow),
-                            ),
+                        ),
+                        const SizedBox(height: 6),
+                        // Hero card rising UP from stage with 3D flip
+                        Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.0018)
+                            ..translateByDouble(0.0, cardRiseY, 0.0, 1.0)
+                            ..rotateX(flipX)
+                            ..scaleByDouble(cardScale, cardScale, 1.0, 1.0),
+                          child: BankCardArtwork(
+                            card: widget.card,
+                            isDockedInSheet: true,
+                            onPayNow: () => _closeSheet(widget.onPayNow),
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  key: const Key('detail_mark_as_paid'),
-                                  onTap: () => _closeSheet(
-                                    () => widget.onActionSelected(
-                                      CardQuickActionType.markAsPaid,
-                                    ),
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 8),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.check_circle_outline_rounded,
-                                          size: 20,
-                                          color: AppColors.inkPrimary,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'mark as paid',
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.inkPrimary,
+                        ),
+                        const SizedBox(height: 16),
+                        Opacity(
+                          opacity: detailsOpacity,
+                          child: Transform.translate(
+                            offset: Offset(0, detailsSlideY),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        key: const Key('detail_mark_as_paid'),
+                                        onTap: () => _closeSheet(
+                                          () => widget.onActionSelected(
+                                            CardQuickActionType.markAsPaid,
                                           ),
                                         ),
-                                      ],
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: const Padding(
+                                          padding:
+                                              EdgeInsets.symmetric(vertical: 8),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons
+                                                    .check_circle_outline_rounded,
+                                                size: 20,
+                                                color: AppColors.inkPrimary,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'mark as paid',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.inkPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 1,
+                                      height: 24,
+                                      color: AppColors.borderSubtle,
+                                    ),
+                                    Expanded(
+                                      child: InkWell(
+                                        key:
+                                            const Key('detail_payment_history'),
+                                        onTap: () => _closeSheet(
+                                          () => widget.onActionSelected(
+                                            CardQuickActionType.paymentHistory,
+                                          ),
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: const Padding(
+                                          padding:
+                                              EdgeInsets.symmetric(vertical: 8),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.history_edu_outlined,
+                                                size: 20,
+                                                color: AppColors.inkPrimary,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'payment history',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.inkPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(
+                                  height: 22,
+                                  color: AppColors.borderSubtle,
+                                ),
+                                Text(
+                                  widget.card.statementSummary.sectionDateLabel
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.4,
+                                    color: AppColors.inkMuted,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                _DetailInfoRow(
+                                  icon: Icons.description_outlined,
+                                  label: 'latest statement',
+                                  value: widget.card.dueAmount > 0
+                                      ? '$formattedDue bill generated'
+                                      : widget.card.statementSummary
+                                          .latestStatementText,
+                                  onTap: () => _closeSheet(
+                                    () => widget.onActionSelected(
+                                      CardQuickActionType.smartStatement,
                                     ),
                                   ),
                                 ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 24,
-                                color: AppColors.borderSubtle,
-                              ),
-                              Expanded(
-                                child: InkWell(
-                                  key: const Key('detail_payment_history'),
+                                const SizedBox(height: 16),
+                                _DetailInfoRow(
+                                  icon: Icons.currency_rupee_rounded,
+                                  label: 'recent spends',
+                                  value: widget.card.recentSpendAmount > 0
+                                      ? widget.card.statementSummary
+                                          .recentSpendsText
+                                      : 'no spends since last statement',
                                   onTap: () => _closeSheet(
                                     () => widget.onActionSelected(
-                                      CardQuickActionType.paymentHistory,
-                                    ),
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 8),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.history_edu_outlined,
-                                          size: 20,
-                                          color: AppColors.inkPrimary,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'payment history',
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.inkPrimary,
-                                          ),
-                                        ),
-                                      ],
+                                      CardQuickActionType.recentSpends,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const Divider(
-                            height: 22,
-                            color: AppColors.borderSubtle,
-                          ),
-                          Text(
-                            widget.card.statementSummary.sectionDateLabel
-                                .toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.4,
-                              color: AppColors.inkMuted,
+                                const SizedBox(height: 16),
+                                _DetailInfoRow(
+                                  icon: Icons.percent_rounded,
+                                  label: 'card offers',
+                                  value: 'verify card to unlock',
+                                  onTap: () => _closeSheet(
+                                    () => widget.onActionSelected(
+                                      CardQuickActionType.cardOffers,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 14),
-                          _DetailInfoRow(
-                            icon: Icons.description_outlined,
-                            label: 'latest statement',
-                            value: widget.card.dueAmount > 0
-                                ? '$formattedDue bill generated'
-                                : widget
-                                    .card.statementSummary.latestStatementText,
-                            onTap: () => _closeSheet(
-                              () => widget.onActionSelected(
-                                CardQuickActionType.smartStatement,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _DetailInfoRow(
-                            icon: Icons.currency_rupee_rounded,
-                            label: 'recent spends',
-                            value: widget.card.recentSpendAmount > 0
-                                ? widget.card.statementSummary.recentSpendsText
-                                : 'no spends since last statement',
-                            onTap: () => _closeSheet(
-                              () => widget.onActionSelected(
-                                CardQuickActionType.recentSpends,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _DetailInfoRow(
-                            icon: Icons.percent_rounded,
-                            label: 'card offers',
-                            value: 'verify card to unlock',
-                            onTap: () => _closeSheet(
-                              () => widget.onActionSelected(
-                                CardQuickActionType.cardOffers,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

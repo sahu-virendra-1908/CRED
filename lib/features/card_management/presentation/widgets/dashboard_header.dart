@@ -32,6 +32,11 @@ class DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+    final isCompactHeight = screenSize.height < 700;
+    final horizontalPad =
+        screenSize.width > 600 ? (screenSize.width - 520) / 2 : AppSpacing.md;
+
     final isDueTab = activeTab == HeaderSegmentTab.totalDue;
     final displayAmount =
         isDueTab ? dashboard.totalDueAmount : dashboard.totalRecentSpendsAmount;
@@ -39,6 +44,9 @@ class DashboardHeader extends StatelessWidget {
     final subtitleText = isDueTab
         ? dashboard.headerSubtitle
         : 'TOTAL SPENDS ACROSS ${dashboard.cards.length} CARDS';
+
+    final heroMajorSize = isCompactHeight ? 32.0 : 38.0;
+    final heroMinorSize = isCompactHeight ? 28.0 : 34.0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -63,10 +71,10 @@ class DashboardHeader extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.xs,
-                AppSpacing.md,
+              padding: EdgeInsets.fromLTRB(
+                horizontalPad,
+                isCompactHeight ? 4 : AppSpacing.xs,
+                horizontalPad,
                 0,
               ),
               child: Column(
@@ -100,37 +108,44 @@ class DashboardHeader extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(height: isCompactHeight ? 12 : AppSpacing.lg),
                   Text(
                     subtitleText,
                     style: AppTypography.overlineCaps,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '${parts.symbol}${parts.wholePart}',
-                        style: AppTypography.heroAmountMajor,
-                      ),
-                      Text(
-                        '.${parts.decimalPart}',
-                        style: AppTypography.heroAmountMinor,
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 22,
-                        color: AppColors.inkPrimary,
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '${parts.symbol}${parts.wholePart}',
+                          style: AppTypography.heroAmountMajor.copyWith(
+                            fontSize: heroMajorSize,
+                          ),
+                        ),
+                        Text(
+                          '.${parts.decimalPart}',
+                          style: AppTypography.heroAmountMinor.copyWith(
+                            fontSize: heroMinorSize,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 22,
+                          color: AppColors.inkPrimary,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(height: isCompactHeight ? 10 : AppSpacing.md),
                   SizedBox(
-                    height: 42,
+                    height: isCompactHeight ? 38 : 42,
                     child: ElevatedButton(
                       key: const Key('header_pay_bill_button'),
                       onPressed: onPayBillPressed,
@@ -155,13 +170,13 @@ class DashboardHeader extends StatelessWidget {
                     ),
                   ),
                   if (dashboard.cashbackBannerText.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(height: isCompactHeight ? 10 : AppSpacing.md),
                     _CashbackBannerPill(
                       text: dashboard.cashbackBannerText,
                       onTap: onBannerPressed,
                     ),
                   ] else
-                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(height: isCompactHeight ? 10 : AppSpacing.md),
                 ],
               ),
             ),
@@ -177,7 +192,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.62);
 
-    // Warm radial glow behind ₹50,000.00
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -190,7 +204,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
           Rect.fromCircle(center: center, radius: size.width * 0.65));
     canvas.drawRect(Offset.zero & size, glowPaint);
 
-    // Subtle curved arch behind the Pay bill CTA
     final archPaint = Paint()
       ..color = const Color(0x14A89B84)
       ..style = PaintingStyle.stroke
@@ -207,7 +220,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
       archPaint,
     );
 
-    // Left gift box & golden star card
     _drawGiftCluster(
       canvas: canvas,
       boxCenter: Offset(18, size.height * 0.70),
@@ -216,7 +228,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
       ribbonDirection: 1.0,
     );
 
-    // Right gift box & golden star card
     _drawGiftCluster(
       canvas: canvas,
       boxCenter: Offset(size.width - 14, size.height * 0.76),
@@ -233,7 +244,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
     required double cardAngle,
     required double ribbonDirection,
   }) {
-    // Flowing champagne ribbon
     final ribbonPaint = Paint()
       ..color = const Color(0x55D4B87A)
       ..style = PaintingStyle.stroke
@@ -250,7 +260,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
       );
     canvas.drawPath(ribbonPath, ribbonPaint);
 
-    // Ivory gift box silhouette
     canvas.save();
     canvas.translate(boxCenter.dx, boxCenter.dy);
     canvas.rotate(cardAngle * 0.6);
@@ -275,7 +284,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
     );
     canvas.restore();
 
-    // Floating metallic gold star card
     canvas.save();
     canvas.translate(cardCenter.dx, cardCenter.dy);
     canvas.rotate(cardAngle);
@@ -292,7 +300,6 @@ class _HeaderRewardBackdropPainter extends CustomPainter {
       goldPaint,
     );
 
-    // Subtle 4-point star emblem on gold card
     final starPaint = Paint()..color = const Color(0xCCFFF8E6);
     final starPath = Path()
       ..moveTo(0, -5)

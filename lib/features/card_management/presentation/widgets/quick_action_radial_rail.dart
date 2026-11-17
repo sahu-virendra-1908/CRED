@@ -15,16 +15,19 @@ class QuickActionRadialRail extends StatelessWidget {
   Widget build(BuildContext context) {
     const leftColumn = <_QuickActionSpec>[
       _QuickActionSpec(
+        keyName: 'action_mark_as_paid',
         type: CardQuickActionType.markAsPaid,
         label: 'mark\nas paid',
         icon: Icons.check_circle_outline_rounded,
       ),
       _QuickActionSpec(
+        keyName: 'action_payment_history',
         type: CardQuickActionType.paymentHistory,
         label: 'payment\nhistory',
         icon: Icons.history_edu_outlined,
       ),
       _QuickActionSpec(
+        keyName: 'action_recent_spends',
         type: CardQuickActionType.recentSpends,
         label: 'recent\nspends',
         icon: Icons.currency_rupee_rounded,
@@ -33,16 +36,19 @@ class QuickActionRadialRail extends StatelessWidget {
 
     const rightColumn = <_QuickActionSpec>[
       _QuickActionSpec(
+        keyName: 'action_smart_statement',
         type: CardQuickActionType.smartStatement,
         label: 'smart\nstatement',
         icon: Icons.description_outlined,
       ),
       _QuickActionSpec(
+        keyName: 'action_card_offers',
         type: CardQuickActionType.cardOffers,
         label: 'card\noffers',
         icon: Icons.percent_rounded,
       ),
       _QuickActionSpec(
+        keyName: 'action_more_actions',
         type: CardQuickActionType.moreActions,
         label: 'more\nactions',
         icon: Icons.hub_outlined,
@@ -76,11 +82,13 @@ class QuickActionRadialRail extends StatelessWidget {
 
 class _QuickActionSpec {
   const _QuickActionSpec({
+    required this.keyName,
     required this.type,
     required this.label,
     required this.icon,
   });
 
+  final String keyName;
   final CardQuickActionType type;
   final String label;
   final IconData icon;
@@ -124,7 +132,7 @@ class _RadialActionNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      key: Key('quick_action_${item.type.name}'),
+      key: Key(item.keyName),
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(

@@ -150,8 +150,7 @@ class _CardDeckStageState extends State<CardDeckStage>
   void _handleVerticalDragUpdate(DragUpdateDetails details, double height) {
     if (!_isVerticalDragging) return;
     final dy = details.primaryDelta ?? 0.0;
-    // Dragging UP (negative dy) pulls the bottom card stack up into the full list
-    final delta = -dy / (height * 0.34);
+    final delta = dy / (height * 0.34);
     _expandController.value = (_expandController.value + delta).clamp(0.0, 1.0);
   }
 
@@ -160,7 +159,7 @@ class _CardDeckStageState extends State<CardDeckStage>
     _isVerticalDragging = false;
 
     final velocity = details.primaryVelocity ?? 0.0;
-    final shouldExpand = velocity < -240 ||
+    final shouldExpand = velocity > 240 ||
         (velocity.abs() <= 240 &&
             (_expandController.value > 0.28 ||
                 (_dragStartExpandValue == 0.0 &&
@@ -215,6 +214,12 @@ class _CardDeckStageState extends State<CardDeckStage>
     widget.onDeckModeChanged(DeckPresentationMode.longPressDetail);
   }
 
+  int _effectivePendingFor(int index, BankCard card) {
+    if (card.pendingActionsCount > 0) return card.pendingActionsCount;
+    if (index == 0) return widget.pendingActionsCount;
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.cards.isEmpty) {
@@ -223,9 +228,8 @@ class _CardDeckStageState extends State<CardDeckStage>
 
     final safeIndex = widget.selectedIndex.clamp(0, widget.cards.length - 1);
     final activeCard = widget.cards[safeIndex];
-    final effectivePendingCount = activeCard.pendingActionsCount > 0
-        ? activeCard.pendingActionsCount
-        : (safeIndex == 0 ? widget.pendingActionsCount : 0);
+    final effectivePendingCount = _effectivePendingFor(safeIndex, activeCard);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     final stackedCards = <MapEntry<int, BankCard>>[];
     for (int i = 0; i < widget.cards.length; i++) {
@@ -241,8 +245,11 @@ class _CardDeckStageState extends State<CardDeckStage>
       builder: (context, constraints) {
         final stageWidth = constraints.maxWidth;
         final stageHeight = constraints.maxHeight;
-        final horizontalPadding = AppSpacing.md;
-        final cardWidth = stageWidth - (horizontalPadding * 2);
+
+        // Constrain card width on tablets/wide viewports while keeping full responsive margins on phones
+        final maxCardWidth = math.min(stageWidth - (AppSpacing.md * 2), 460.0);
+        final cardWidth = maxCardWidth.clamp(240.0, 460.0);
+        final horizontalOffset = (stageWidth - cardWidth) / 2;
         final cardHeight = cardWidth / 1.586;
 
         return GestureDetector(
@@ -267,6 +274,11 @@ class _CardDeckStageState extends State<CardDeckStage>
                 return _ExpandedVerticalCardList(
                   cards: widget.cards,
                   selectedIndex: safeIndex,
+                  cardWidth: cardWidth,
+                  bottomInset: bottomInset,
+                  flipperInterval: widget.flipperInterval,
+                  isPaused: isDetailOpen,
+                  pendingCountResolver: _effectivePendingFor,
                   controller: _verticalListController,
                   onSelectCard: (idx) {
                     widget.onSelectCard(idx);
@@ -277,6 +289,14 @@ class _CardDeckStageState extends State<CardDeckStage>
                     widget.onDeckModeChanged(
                       DeckPresentationMode.collapsedStack,
                     );
+                  },
+                  onViewDetailsForCard: (idx) {
+                    widget.onSelectCard(idx);
+                    _openCardDetailFoldout();
+                  },
+                  onPendingActionsForCard: (idx) {
+                    widget.onSelectCard(idx);
+                    widget.onPendingActionsTap();
                   },
                   onCollapse: () {
                     _expandController.animateTo(
@@ -297,8 +317,8 @@ class _CardDeckStageState extends State<CardDeckStage>
                   if (peekT > 0.01)
                     Positioned(
                       top: 10,
-                      right: 14,
-                      width: stageWidth * 0.46,
+                      right: horizontalOffset,
+                      width: cardWidth * 0.50,
                       height: cardHeight,
                       child: Opacity(
                         opacity: peekT.clamp(0.0, 1.0),
@@ -310,19 +330,18 @@ class _CardDeckStageState extends State<CardDeckStage>
                         ),
                       ),
                     ),
-                  // Responsive bottom stacked cards (back-to-front z-index order)
                   ..._buildBottomStackedCards(
                     stackedCards: stackedCards,
                     stageWidth: stageWidth,
                     stageHeight: stageHeight,
                     cardWidth: cardWidth,
                     cardHeight: cardHeight,
+                    bottomInset: bottomInset,
                     expandT: expandT,
                   ),
-                  // Primary front card
                   Positioned(
                     top: 10 - (expandT * 18),
-                    left: horizontalPadding,
+                    left: horizontalOffset,
                     width: cardWidth,
                     child: IgnorePointer(
                       ignoring: isDetailOpen,
@@ -434,6 +453,7 @@ class _CardDeckStageState extends State<CardDeckStage>
     required double stageHeight,
     required double cardWidth,
     required double cardHeight,
+    required double bottomInset,
     required double expandT,
   }) {
     if (stackedCards.isEmpty) return const <Widget>[];
@@ -441,18 +461,24 @@ class _CardDeckStageState extends State<CardDeckStage>
     final visibleCount = math.min(stackedCards.length, 4);
     final widgets = <Widget>[];
 
-    // Responsive proportional peek heights & width scales based on available stageHeight
-    final basePeek = (stageHeight * 0.16).clamp(64.0, 96.0);
-    final stepPeek = (stageHeight * 0.052).clamp(18.0, 32.0);
+    // Adapt stack peek dynamically so it never collides with the active card on short screens
+    final pillBottomY = 10 + cardHeight + 48;
+    final availableForStack =
+        (stageHeight - pillBottomY - bottomInset).clamp(72.0, 220.0);
+    final maxAllowedPeek = (availableForStack * 0.90).clamp(68.0, 184.0);
+    final basePeek = (maxAllowedPeek * 0.48).clamp(44.0, 92.0);
+    final stepPeek =
+        ((maxAllowedPeek - basePeek) / math.max(1, visibleCount - 1))
+            .clamp(12.0, 30.0);
     const widthScales = <double>[0.96, 0.90, 0.83, 0.74];
 
     for (int depth = visibleCount - 1; depth >= 0; depth--) {
       final entry = stackedCards[depth];
       final targetScale = widthScales[depth];
       final scale = targetScale + ((1.0 - targetScale) * expandT);
-      final peekHeight = basePeek + (depth * stepPeek);
+      final peekHeight = basePeek + (depth * stepPeek) + bottomInset;
       final collapsedTop = stageHeight - peekHeight;
-      final expandedTop = 10.0 + ((depth + 1) * (cardHeight + 14.0));
+      final expandedTop = 10.0 + ((depth + 1) * (cardHeight + 56.0));
       final currentTop =
           collapsedTop + ((expandedTop - collapsedTop) * expandT);
 
@@ -482,7 +508,7 @@ class _CardDeckStageState extends State<CardDeckStage>
             },
             child: BankCardArtwork(
               card: entry.value,
-              isDimmed: depth >= 2 && expandT < 0.5,
+              isDimmed: expandT < 0.5,
               onPayNow: () => widget.onPayNow(entry.value),
             ),
           ),
@@ -579,7 +605,11 @@ class _FlipperActionPillState extends State<_FlipperActionPill> {
         _syncTimer();
       },
       child: GestureDetector(
-        key: Key(showingDetails ? 'view_details_pill' : 'pending_actions_pill'),
+        key: Key(
+          showingDetails
+              ? 'view_details_pill_${widget.cardId}'
+              : 'pending_actions_pill_${widget.cardId}',
+        ),
         onTap: showingDetails
             ? widget.onViewDetailsTap
             : widget.onPendingActionsTap,
@@ -613,7 +643,6 @@ class _FlipperActionPillState extends State<_FlipperActionPill> {
                 );
               },
               transitionBuilder: (child, animation) {
-                // Pure vertical slot-roller transition (slides up from bottom, exits upward)
                 final isIncoming = child.key ==
                     ValueKey(
                       showingDetails
@@ -710,16 +739,30 @@ class _ExpandedVerticalCardList extends StatelessWidget {
   const _ExpandedVerticalCardList({
     required this.cards,
     required this.selectedIndex,
+    required this.cardWidth,
+    required this.bottomInset,
+    required this.flipperInterval,
+    required this.isPaused,
+    required this.pendingCountResolver,
     required this.controller,
     required this.onSelectCard,
+    required this.onViewDetailsForCard,
+    required this.onPendingActionsForCard,
     required this.onCollapse,
     required this.onPayNow,
   });
 
   final List<BankCard> cards;
   final int selectedIndex;
+  final double cardWidth;
+  final double bottomInset;
+  final Duration flipperInterval;
+  final bool isPaused;
+  final int Function(int index, BankCard card) pendingCountResolver;
   final ScrollController controller;
   final ValueChanged<int> onSelectCard;
+  final ValueChanged<int> onViewDetailsForCard;
+  final ValueChanged<int> onPendingActionsForCard;
   final VoidCallback onCollapse;
   final ValueChanged<BankCard> onPayNow;
 
@@ -728,8 +771,8 @@ class _ExpandedVerticalCardList extends StatelessWidget {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is OverscrollNotification &&
-            notification.overscroll < -8 &&
-            controller.offset <= 0) {
+            notification.overscroll > 8 &&
+            controller.position.pixels >= controller.position.maxScrollExtent) {
           onCollapse();
           return true;
         }
@@ -737,30 +780,39 @@ class _ExpandedVerticalCardList extends StatelessWidget {
       },
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'ALL CARDS (${cards.length})',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                    color: AppColors.inkSecondary,
-                  ),
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: cardWidth + 32),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'ALL CARDS (${cards.length})',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: AppColors.inkSecondary,
+                      ),
+                    ),
+                    TextButton.icon(
+                      key: const Key('collapse_deck_button'),
+                      onPressed: onCollapse,
+                      icon:
+                          const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+                      label: const Text(
+                        'Stack view',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  key: const Key('collapse_deck_button'),
-                  onPressed: onCollapse,
-                  icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
-                  label: const Text(
-                    'Stack view',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           Expanded(
@@ -770,25 +822,51 @@ class _ExpandedVerticalCardList extends StatelessWidget {
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 28 + bottomInset),
               itemCount: cards.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (_, __) => const SizedBox(height: 18),
               itemBuilder: (context, index) {
                 final card = cards[index];
                 final isSelected = index == selectedIndex;
-                return GestureDetector(
-                  onTap: () => onSelectCard(index),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.cardRadius),
-                      border: isSelected
-                          ? Border.all(color: AppColors.inkPrimary, width: 2)
-                          : null,
-                    ),
-                    child: BankCardArtwork(
-                      card: card,
-                      onPayNow: () => onPayNow(card),
+                final pendingCount = pendingCountResolver(index, card);
+
+                return Center(
+                  child: SizedBox(
+                    width: cardWidth,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => onSelectCard(index),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.cardRadius,
+                              ),
+                              border: isSelected
+                                  ? Border.all(
+                                      color: AppColors.inkPrimary,
+                                      width: 2,
+                                    )
+                                  : null,
+                            ),
+                            child: BankCardArtwork(
+                              card: card,
+                              onPayNow: () => onPayNow(card),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _FlipperActionPill(
+                          cardId: card.id,
+                          pendingCount: pendingCount,
+                          interval: flipperInterval,
+                          isPaused: isPaused,
+                          onPendingActionsTap: () =>
+                              onPendingActionsForCard(index),
+                          onViewDetailsTap: () => onViewDetailsForCard(index),
+                        ),
+                      ],
                     ),
                   ),
                 );

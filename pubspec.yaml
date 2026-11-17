@@ -25,6 +25,28 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 flutter:
+  assets:
+    - assets/icon/cred_logo.png
+    - assets/icon/cred_logo_foreground.png
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/cred_logo.png"
+  adaptive_icon_background: "assets/icon/cred_logo_bg.png"
+  adaptive_icon_foreground: "assets/icon/cred_logo_foreground.png"
+
+flutter_native_splash:
+  color: "#141416"
+  image: "assets/icon/empty_splash.png"
+  android_12:
+    color: "#141416"
+    icon_background_color: "#141416"
+    image: "assets/icon/empty_splash.png"
+  ios: false
+  web: false

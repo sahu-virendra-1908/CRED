@@ -53,7 +53,10 @@ void main() {
     expect(find.byKey(const Key('action_mark_as_paid')), findsOneWidget);
     expect(find.byKey(const Key('action_smart_statement')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('active_bank_card')));
+    final shiftedCardRect =
+        tester.getRect(find.byKey(const Key('active_bank_card')));
+    await tester
+        .tapAt(Offset(shiftedCardRect.left + 20, shiftedCardRect.center.dy));
     await tester.pumpAndSettle();
 
     await tester.longPress(find.byKey(const Key('active_bank_card')));
@@ -61,13 +64,12 @@ void main() {
     expect(find.text('latest statement'), findsOneWidget);
     expect(find.text('verify card to unlock'), findsOneWidget);
 
-    await tester.tapAt(const Offset(10, 10));
+    await tester.tap(find.byKey(const Key('close_card_detail_button')));
     await tester.pumpAndSettle();
 
-    await tester.fling(
-      find.byKey(const Key('card_deck_gesture_surface')),
-      const Offset(0, 260),
-      900,
+    await tester.drag(
+      find.byKey(const Key('active_bank_card')),
+      const Offset(0, 220),
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('expanded_cards_list_view')), findsOneWidget);

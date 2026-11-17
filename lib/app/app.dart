@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/splash/cred_splash_gate.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -31,10 +32,15 @@ class _CardManagementAppState extends State<CardManagementApp>
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'CRED Card Management',
+      title: 'CRED',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: _appRouter.router,
+      builder: (context, child) {
+        return CredSplashGate(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

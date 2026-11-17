@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_spacing.dart';
-import '../../../../app/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/bank_card.dart';
 
@@ -32,175 +31,201 @@ class BankCardArtwork extends StatelessWidget {
     return RepaintBoundary(
       child: AspectRatio(
         aspectRatio: 1.586,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [card.primaryColor, card.secondaryColor],
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 16,
-                offset: Offset(0, -3),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final scale = (w / 344.0).clamp(0.76, 1.32);
+            final pad = (18.0 * scale).clamp(12.0, 26.0);
+            final logoBandHeight = (24.0 * scale).clamp(18.0, 32.0);
+            final amountFontSize = (18.0 * scale).clamp(14.0, 24.0);
+            final digitsFontSize = (13.0 * scale).clamp(10.5, 17.0);
+            final dueDateFontSize = (10.0 * scale).clamp(8.5, 13.0);
+            final holderFontSize = (12.5 * scale).clamp(10.0, 16.0);
+            final btnHeight = (35.0 * scale).clamp(28.0, 44.0);
+            final btnHPad = (16.0 * scale).clamp(12.0, 24.0);
+
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [card.primaryColor, card.secondaryColor],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 16,
+                    offset: Offset(0, -3),
+                  ),
+                  BoxShadow(
+                    color: Color(0x28000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 10),
+                  ),
+                ],
               ),
-              BoxShadow(
-                color: Color(0x28000000),
-                blurRadius: 18,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (hasRemoteCardArt)
-                  Image.network(
-                    card.cardBackgroundUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _FallbackCardBase(card: card),
-                  )
-                else
-                  _FallbackCardBase(card: card),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (hasRemoteCardArt)
+                      Image.network(
+                        card.cardBackgroundUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _FallbackCardBase(card: card, scale: scale),
+                      )
+                    else
+                      _FallbackCardBase(card: card, scale: scale),
+                    Padding(
+                      padding: EdgeInsets.all(pad),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Reserve exact height of baked-in bank logo row in CloudFront art
-                                const SizedBox(height: 24),
-                                if (!isDockedInSheet) ...[
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    '\u2022\u2022  ${card.lastFourDigits}',
-                                    style: AppTypography.cardDigits,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (showDueDetails)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                RichText(
-                                  text: TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text:
-                                            '${amountParts.symbol}${amountParts.wholePart}',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: '.${amountParts.decimalPart}',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w300,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(height: logoBandHeight),
+                                    if (!isDockedInSheet) ...[
+                                      SizedBox(height: 8.0 * scale),
+                                      Text(
+                                        '\u2022\u2022  ${card.lastFourDigits}',
+                                        style: TextStyle(
+                                          fontSize: digitsFontSize,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 1.4,
                                           color: Colors.white,
                                         ),
                                       ),
                                     ],
+                                  ],
+                                ),
+                              ),
+                              if (showDueDetails)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    RichText(
+                                      text: TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text:
+                                                '${amountParts.symbol}${amountParts.wholePart}',
+                                            style: TextStyle(
+                                              fontSize: amountFontSize,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: '.${amountParts.decimalPart}',
+                                            style: TextStyle(
+                                              fontSize: amountFontSize,
+                                              fontWeight: FontWeight.w300,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(height: 3.0 * scale),
+                                    Text(
+                                      card.dueDateText,
+                                      style: TextStyle(
+                                        fontSize: dueDateFontSize,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1.0,
+                                        color: const Color(0xD9FFFFFF),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else if (card.isPaid && !isDockedInSheet)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 10.0 * scale,
+                                    vertical: 4.0 * scale,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x29FFFFFF),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    'NO DUES',
+                                    style: TextStyle(
+                                      fontSize: dueDateFontSize,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.0,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  card.dueDateText,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 1.0,
-                                    color: Color(0xD9FFFFFF),
+                            ],
+                          ),
+                          const Spacer(),
+                          if (!isDockedInSheet && !isDimmed)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    card.cardHolderName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: holderFontSize,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 10.0 * scale),
+                                SizedBox(
+                                  height: btnHeight,
+                                  child: ElevatedButton(
+                                    onPressed: onPayNow,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: const Color(0xFF141416),
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: btnHPad,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Pay now',
+                                      style: TextStyle(
+                                        fontSize:
+                                            (13.0 * scale).clamp(11.0, 15.5),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
-                            )
-                          else if (card.isPaid && !isDockedInSheet)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0x29FFFFFF),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'NO DUES',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.0,
-                                  color: Colors.white,
-                                ),
-                              ),
                             ),
                         ],
                       ),
-                      const Spacer(),
-                      if (!isDockedInSheet)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                card.cardHolderName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.cardHolderName,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              height: 36,
-                              child: ElevatedButton(
-                                onPressed: onPayNow,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: const Color(0xFF141416),
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Pay now',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+                    ),
+                    if (isDimmed)
+                      const ColoredBox(
+                        color: Color(0x29000000),
+                      ),
+                  ],
                 ),
-                if (isDimmed)
-                  const ColoredBox(
-                    color: Color(0x29000000),
-                  ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -208,12 +233,17 @@ class BankCardArtwork extends StatelessWidget {
 }
 
 class _FallbackCardBase extends StatelessWidget {
-  const _FallbackCardBase({required this.card});
+  const _FallbackCardBase({
+    required this.card,
+    required this.scale,
+  });
 
   final BankCard card;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
+    final pad = (18.0 * scale).clamp(12.0, 26.0);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -221,23 +251,23 @@ class _FallbackCardBase extends StatelessWidget {
           painter: _CardPatternPainter(pattern: card.pattern),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+          padding: EdgeInsets.all(pad),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.credit_card_rounded,
                     color: Colors.white,
-                    size: 18,
+                    size: (18.0 * scale).clamp(14.0, 22.0),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.0 * scale),
                   Text(
                     card.bankName,
-                    style: const TextStyle(
-                      fontSize: 13.5,
+                    style: TextStyle(
+                      fontSize: (13.5 * scale).clamp(11.0, 17.0),
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.0,
                       color: Colors.white,
@@ -245,8 +275,8 @@ class _FallbackCardBase extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 36),
-              const _EmvChipIllustration(),
+              SizedBox(height: 32.0 * scale),
+              _EmvChipIllustration(scale: scale),
             ],
           ),
         ),
@@ -256,13 +286,15 @@ class _FallbackCardBase extends StatelessWidget {
 }
 
 class _EmvChipIllustration extends StatelessWidget {
-  const _EmvChipIllustration();
+  const _EmvChipIllustration({required this.scale});
+
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 38,
-      height: 28,
+      width: 36.0 * scale,
+      height: 26.0 * scale,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
         gradient: const LinearGradient(

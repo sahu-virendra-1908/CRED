@@ -101,92 +101,118 @@ class CardManagementScreen extends ConsumerWidget {
     final selectedCard =
         dashboard.cards[selectedIndex.clamp(0, dashboard.cards.length - 1)];
 
+    final headerWidget = DashboardHeader(
+      dashboard: dashboard,
+      activeTab: activeTab,
+      onTabChanged: notifier.switchTab,
+      onPayBillPressed: () => _openQuickActionSheet(
+        context,
+        ref,
+        selectedCard,
+        CardQuickActionType.markAsPaid,
+      ),
+      onOffersPressed: () => _openQuickActionSheet(
+        context,
+        ref,
+        selectedCard,
+        CardQuickActionType.cardOffers,
+      ),
+      onSettingsPressed: () => _openQuickActionSheet(
+        context,
+        ref,
+        selectedCard,
+        CardQuickActionType.moreActions,
+      ),
+      onBannerPressed: () => notifier.notifyAction(
+        dashboard.cashbackBannerText,
+      ),
+    );
+
+    final deckWidget = CardDeckStage(
+      cards: dashboard.cards,
+      selectedIndex: selectedIndex,
+      deckMode: deckMode,
+      pendingActionsCount: dashboard.pendingActionsCount,
+      onSelectCard: notifier.selectCard,
+      onDeckModeChanged: notifier.setDeckMode,
+      onQuickAction: (action) => _openQuickActionSheet(
+        context,
+        ref,
+        selectedCard,
+        action,
+      ),
+      onPayNow: (card) => _openQuickActionSheet(
+        context,
+        ref,
+        card,
+        CardQuickActionType.markAsPaid,
+      ),
+      onPendingActionsTap: () => _openQuickActionSheet(
+        context,
+        ref,
+        selectedCard,
+        CardQuickActionType.moreActions,
+      ),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.canvasTop,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final useSplitLayout =
+              constraints.maxWidth >= 680 || constraints.maxHeight < 640;
+
+          return Stack(
+            fit: StackFit.expand,
             children: [
-              DashboardHeader(
-                dashboard: dashboard,
-                activeTab: activeTab,
-                onTabChanged: notifier.switchTab,
-                onPayBillPressed: () => _openQuickActionSheet(
-                  context,
-                  ref,
-                  selectedCard,
-                  CardQuickActionType.markAsPaid,
+              if (useSplitLayout)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: SingleChildScrollView(
+                        child: headerWidget,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 6,
+                      child: deckWidget,
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    headerWidget,
+                    Expanded(child: deckWidget),
+                  ],
                 ),
-                onOffersPressed: () => _openQuickActionSheet(
-                  context,
-                  ref,
-                  selectedCard,
-                  CardQuickActionType.cardOffers,
-                ),
-                onSettingsPressed: () => _openQuickActionSheet(
-                  context,
-                  ref,
-                  selectedCard,
-                  CardQuickActionType.moreActions,
-                ),
-                onBannerPressed: () => notifier.notifyAction(
-                  dashboard.cashbackBannerText,
-                ),
-              ),
-              Expanded(
-                child: CardDeckStage(
-                  cards: dashboard.cards,
-                  selectedIndex: selectedIndex,
-                  deckMode: deckMode,
-                  pendingActionsCount: dashboard.pendingActionsCount,
-                  onSelectCard: notifier.selectCard,
-                  onDeckModeChanged: notifier.setDeckMode,
-                  onQuickAction: (action) => _openQuickActionSheet(
-                    context,
-                    ref,
-                    selectedCard,
-                    action,
-                  ),
-                  onPayNow: (card) => _openQuickActionSheet(
-                    context,
-                    ref,
-                    card,
-                    CardQuickActionType.markAsPaid,
-                  ),
-                  onPendingActionsTap: () => _openQuickActionSheet(
-                    context,
-                    ref,
-                    selectedCard,
-                    CardQuickActionType.moreActions,
+              if (deckMode == DeckPresentationMode.longPressDetail)
+                Positioned.fill(
+                  child: CardLongPressSheet(
+                    card: selectedCard,
+                    onDismiss: () => notifier.setDeckMode(
+                      DeckPresentationMode.collapsedStack,
+                    ),
+                    onActionSelected: (action) {
+                      notifier.setDeckMode(DeckPresentationMode.collapsedStack);
+                      _openQuickActionSheet(context, ref, selectedCard, action);
+                    },
+                    onPayNow: () {
+                      notifier.setDeckMode(DeckPresentationMode.collapsedStack);
+                      _openQuickActionSheet(
+                        context,
+                        ref,
+                        selectedCard,
+                        CardQuickActionType.markAsPaid,
+                      );
+                    },
                   ),
                 ),
-              ),
             ],
-          ),
-          if (deckMode == DeckPresentationMode.longPressDetail)
-            Positioned.fill(
-              child: CardLongPressSheet(
-                card: selectedCard,
-                onDismiss: () => notifier.setDeckMode(
-                  DeckPresentationMode.collapsedStack,
-                ),
-                onActionSelected: (action) {
-                  notifier.setDeckMode(DeckPresentationMode.collapsedStack);
-                  _openQuickActionSheet(context, ref, selectedCard, action);
-                },
-                onPayNow: () {
-                  notifier.setDeckMode(DeckPresentationMode.collapsedStack);
-                  _openQuickActionSheet(
-                    context,
-                    ref,
-                    selectedCard,
-                    CardQuickActionType.markAsPaid,
-                  );
-                },
-              ),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
